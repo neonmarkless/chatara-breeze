@@ -9,7 +9,7 @@ import ChatContainer from '@/components/ChatContainer';
 import MessageInput from '@/components/MessageInput';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-// Upload the image provided by the user
+// Import logo
 import logo from '/public/lovable-uploads/0f134484-91a6-40ac-b2ba-bd16b3b501e0.png';
 
 const Index = () => {
@@ -19,7 +19,7 @@ const Index = () => {
     <DirectionProvider>
       <SettingsProvider>
         <ChatProvider>
-          <div className="flex h-screen overflow-hidden bg-background">
+          <div className="flex h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
             {/* Sidebar - hidden on mobile by default */}
             {!isMobile && <ChatSidebar />}
             

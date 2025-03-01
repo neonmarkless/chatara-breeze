@@ -33,4 +33,6 @@ export interface ChatContextType {
   deleteConversation: (id: string) => void;
   searchConversations: (query: string) => void;
   searchResults: Conversation[];
+  isStreaming: boolean;
+  streamingContent: string;
 }

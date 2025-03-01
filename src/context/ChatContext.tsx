@@ -6,6 +6,10 @@ import { Message, Conversation, ChatContextType, Attachment } from '@/types/chat
 // Create the context
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+// Flowise API configuration
+const FLOWISE_API_HOST = "https://flowiseai-railway-production-bdd9.up.railway.app";
+const FLOWISE_CHATFLOW_ID = "e28d78ce-c925-46ba-814b-590bf34bd951";
+
 // Provider component
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -13,6 +17,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
   // Initialize with a demo conversation or load from storage
   useEffect(() => {
@@ -110,6 +116,124 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSearchResults(results);
   };
 
+  // Stream a response from Flowise
+  const streamResponse = async (
+    conversationId: string, 
+    conversationHistory: { role: string; content: string }[]
+  ) => {
+    try {
+      const response = await fetch(`${FLOWISE_API_HOST}/api/v1/prediction/${FLOWISE_CHATFLOW_ID}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          question: conversationHistory[conversationHistory.length - 1].content,
+          history: conversationHistory.slice(0, -1),
+          streaming: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error('ReadableStream not supported');
+      }
+
+      // Initialize streaming
+      setIsStreaming(true);
+      setStreamingContent('');
+      
+      // Get message ID that will be updated with streaming content
+      const messageId = uuidv4();
+      
+      // Add initial empty assistant message
+      const initialAssistantMessage: Message = {
+        id: messageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date()
+      };
+      
+      // Update current conversation with empty message
+      const updatedConversation = {
+        ...currentConversation!,
+        messages: [...currentConversation!.messages, initialAssistantMessage],
+        updatedAt: new Date()
+      };
+      
+      setCurrentConversation(updatedConversation);
+      setConversations(prev => 
+        prev.map(conv => conv.id === conversationId ? updatedConversation : conv)
+      );
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedContent = '';
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        
+        if (done) break;
+        
+        const chunkText = decoder.decode(value);
+        accumulatedContent += chunkText;
+        setStreamingContent(accumulatedContent);
+        
+        // Update the assistant message with the latest content
+        const updatedMessage = {
+          ...initialAssistantMessage,
+          content: accumulatedContent
+        };
+        
+        const updatedConversationWithStream = {
+          ...updatedConversation,
+          messages: updatedConversation.messages.map(msg => 
+            msg.id === messageId ? updatedMessage : msg
+          ),
+          updatedAt: new Date()
+        };
+        
+        setCurrentConversation(updatedConversationWithStream);
+        setConversations(prev => 
+          prev.map(conv => conv.id === conversationId ? updatedConversationWithStream : conv)
+        );
+      }
+      
+      // Streaming complete
+      setIsStreaming(false);
+      setIsLoading(false);
+      
+    } catch (error) {
+      console.error('Error with streaming response:', error);
+      setIsStreaming(false);
+      setIsLoading(false);
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: "I'm sorry, I encountered an error processing your request. Please try again.",
+        timestamp: new Date()
+      };
+      
+      const conversationWithError = {
+        ...currentConversation!,
+        messages: [...currentConversation!.messages, errorMessage],
+        updatedAt: new Date()
+      };
+      
+      setCurrentConversation(conversationWithError);
+      setConversations(prev => 
+        prev.map(conv => conv.id === conversationId ? conversationWithError : conv)
+      );
+    }
+  };
+
   // Add a message to the current conversation
   const addMessage = async (content: string, role: 'user' | 'assistant' | 'system', attachments: Attachment[] = []) => {
     if (!currentConversation) return;
@@ -153,51 +277,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Prepare conversation history for Flowise API
+        const conversationHistory = currentConversation.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
         
-        // Simulated response for demo (would normally come from API)
-        let aiResponse: string;
+        // Add the current message to history
+        conversationHistory.push({
+          role: 'user',
+          content
+        });
         
-        // Handle different types of inputs
-        if (attachments && attachments.length > 0) {
-          aiResponse = "I've received your file(s). Let me process them and get back to you with my analysis.";
-        } else if (content.toLowerCase().includes('hello') || content.toLowerCase().includes('hi')) {
-          aiResponse = "Hello! How can I assist you today?";
-        } else if (content.toLowerCase().includes('help')) {
-          aiResponse = "I'd be happy to help. Could you provide more details about what you need assistance with?";
-        } else if (content.toLowerCase().includes('thank')) {
-          aiResponse = "You're welcome! Is there anything else I can help you with?";
-        } else if (content.toLowerCase().includes('weather')) {
-          aiResponse = "I don't have real-time access to weather data, but I can help you understand weather patterns or direct you to reliable weather services.";
-        } else if (content.includes('?')) {
-          aiResponse = "That's an interesting question. While I don't have access to real-time information, I can provide general guidance on this topic.";
-        } else if (content.toLowerCase().includes('code') || content.toLowerCase().includes('javascript')) {
-          aiResponse = "Here's a simple example in JavaScript:\n\n```javascript\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet('World'));\n// Outputs: Hello, World!\n```\n\nYou can modify this to suit your needs.";
-        } else {
-          aiResponse = "I'm a virtual assistant ready to help with any questions or tasks. What else would you like to know?";
-        }
+        // Stream the response
+        await streamResponse(currentConversation.id, conversationHistory);
         
-        // Add the AI response
-        const aiMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date()
-        };
-        
-        const conversationWithResponse = {
-          ...finalConversation,
-          messages: [...finalConversation.messages, aiMessage],
-          updatedAt: new Date()
-        };
-        
-        setCurrentConversation(conversationWithResponse);
-        setConversations(prev => 
-          prev.map(conv => (conv.id === currentConversation.id ? conversationWithResponse : conv))
-        );
       } catch (error) {
         console.error('Error generating response:', error);
+        setIsLoading(false);
+        
         // Add an error message
         const errorMessage: Message = {
           id: uuidv4(),
@@ -216,8 +314,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setConversations(prev => 
           prev.map(conv => (conv.id === currentConversation.id ? conversationWithError : conv))
         );
-      } finally {
-        setIsLoading(false);
       }
     }
   };
@@ -231,7 +327,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     newConversation,
     deleteConversation,
     searchConversations,
-    searchResults
+    searchResults,
+    isStreaming,
+    streamingContent
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

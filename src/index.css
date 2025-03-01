@@ -137,6 +137,37 @@
   }
 }
 
+/* Cursor Animation */
+@keyframes cursor-blink {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-cursor {
+  animation: cursor-blink 1s infinite;
+}
+
+/* Pulse Light Animation */
+@keyframes pulse-light {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-pulse-light {
+  animation: pulse-light 2s ease-in-out infinite;
+}
+
 /* RTL Support */
 [dir="rtl"] .ltr-text {
   direction: ltr;
@@ -169,4 +200,51 @@ pre code {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background-color: rgba(155, 155, 155, 0.5);
   border-radius: 20px;
+}
+
+/* Glassmorphism effect */
+.glass-panel {
+  @apply backdrop-blur-sm bg-white/90 dark:bg-black/70 border border-gray-200 dark:border-gray-800;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Card hover effects */
+.hover-card {
+  @apply transition-all duration-300;
+}
+
+.hover-card:hover {
+  @apply shadow-md -translate-y-1;
+}
+
+/* Fade in animation */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide in animation */
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

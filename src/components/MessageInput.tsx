@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SendIcon, MicIcon, PaperclipIcon, X } from 'lucide-react';
+import { SendIcon, MicIcon, PaperclipIcon, X, AlertCircle } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -13,10 +13,11 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const MessageInput: React.FC = () => {
   const { t } = useTranslation();
-  const { addMessage, isLoading } = useChat();
+  const { addMessage, isLoading, isStreaming } = useChat();
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -32,9 +33,20 @@ const MessageInput: React.FC = () => {
     textareaRef.current.style.height = scrollHeight > 200 ? '200px' : `${scrollHeight}px`;
   }, [message]);
 
+  // Clear error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!message.trim() && attachments.length === 0) || isLoading) return;
+    if ((!message.trim() && attachments.length === 0) || isLoading || isStreaming) return;
     
     addMessage(message.trim(), 'user', attachments);
     setMessage('');
@@ -57,11 +69,12 @@ const MessageInput: React.FC = () => {
     if (!files || files.length === 0) return;
 
     const newAttachments: Attachment[] = [];
+    let hasError = false;
     
     Array.from(files).forEach(file => {
       if (file.size > MAX_FILE_SIZE) {
-        // Could use toast notification here
-        console.error(`File ${file.name} exceeds the maximum size limit of 5MB`);
+        setError(`File ${file.name} exceeds the maximum size limit of 5MB`);
+        hasError = true;
         return;
       }
 
@@ -76,7 +89,9 @@ const MessageInput: React.FC = () => {
       });
     });
 
-    setAttachments([...attachments, ...newAttachments]);
+    if (!hasError) {
+      setAttachments([...attachments, ...newAttachments]);
+    }
     
     // Reset file input
     if (fileInputRef.current) {
@@ -102,20 +117,28 @@ const MessageInput: React.FC = () => {
       onSubmit={handleSubmit}
       className="px-4 pb-4 relative max-w-3xl mx-auto w-full"
     >
+      {/* Error message */}
+      {error && (
+        <div className="mb-2 text-red-500 text-sm flex items-center">
+          <AlertCircle size={14} className="mr-1" />
+          {error}
+        </div>
+      )}
+      
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {attachments.map(attachment => (
             <div 
               key={attachment.id} 
-              className="relative flex items-center p-2 bg-secondary rounded-md"
+              className="relative flex items-center p-2 bg-secondary rounded-md shadow-sm group"
             >
               <span className="text-xs mr-8">{attachment.name.length > 20 ? `${attachment.name.substring(0, 20)}...` : attachment.name}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-5 w-5 p-0 absolute right-1"
+                className="h-5 w-5 p-0 absolute right-1 opacity-50 group-hover:opacity-100"
                 onClick={() => removeAttachment(attachment.id)}
               >
                 <X size={14} />
@@ -125,13 +148,14 @@ const MessageInput: React.FC = () => {
         </div>
       )}
 
-      <div className="relative rounded-xl border bg-background shadow-sm flex items-end">
+      <div className="relative rounded-xl border bg-white dark:bg-gray-800 shadow-sm flex items-end transition-all">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="h-10 w-10 p-2 text-muted-foreground hover:text-foreground"
           onClick={handleFileClick}
+          disabled={isLoading || isStreaming}
         >
           <PaperclipIcon size={20} />
           <span className="sr-only">Attach file</span>
@@ -142,6 +166,7 @@ const MessageInput: React.FC = () => {
           onChange={handleFileChange}
           multiple
           className="hidden"
+          disabled={isLoading || isStreaming}
         />
         
         <textarea
@@ -149,12 +174,13 @@ const MessageInput: React.FC = () => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('whatCanIHelpWith')}
-          disabled={isLoading}
+          placeholder={isLoading || isStreaming ? t('waitingForResponse') : t('whatCanIHelpWith')}
+          disabled={isLoading || isStreaming}
           rows={1}
           className={cn(
             "flex-1 resize-none bg-transparent px-3 py-2.5 focus:outline-none",
-            "placeholder:text-muted-foreground min-h-[44px] max-h-[200px] overflow-y-auto scrollbar-thin"
+            "placeholder:text-muted-foreground min-h-[44px] max-h-[200px] overflow-y-auto scrollbar-thin",
+            (isLoading || isStreaming) && "opacity-50"
           )}
         />
         
@@ -170,6 +196,7 @@ const MessageInput: React.FC = () => {
                   isVoiceRecording ? "text-primary" : ""
                 )}
                 onClick={toggleVoiceRecording}
+                disabled={isLoading || isStreaming}
               >
                 <MicIcon size={20} />
                 <span className="sr-only">Voice input</span>
@@ -186,13 +213,15 @@ const MessageInput: React.FC = () => {
             <TooltipTrigger asChild>
               <Button
                 type="submit"
-                disabled={(message.trim() === '' && attachments.length === 0) || isLoading}
+                disabled={(message.trim() === '' && attachments.length === 0) || isLoading || isStreaming}
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-10 w-10 p-2 mr-1 text-muted-foreground",
-                  (message.trim() !== '' || attachments.length > 0) ? "hover:text-foreground" : "",
-                  (message.trim() === '' && attachments.length === 0) || isLoading ? "opacity-50 cursor-not-allowed" : ""
+                  "h-10 w-10 p-2 mr-1",
+                  (message.trim() !== '' || attachments.length > 0) && !isLoading && !isStreaming 
+                    ? "text-primary hover:text-primary/80" 
+                    : "text-muted-foreground",
+                  (message.trim() === '' && attachments.length === 0) || isLoading || isStreaming ? "opacity-50 cursor-not-allowed" : ""
                 )}
               >
                 <SendIcon size={20} />
@@ -206,8 +235,8 @@ const MessageInput: React.FC = () => {
         </TooltipProvider>
       </div>
       
-      <p className="text-xs text-center text-muted-foreground mt-2">
-        {t('canMakeMistakes')}
+      <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse-light">
+        {isStreaming ? t('aiIsGenerating') : t('canMakeMistakes')}
       </p>
     </form>
   );
