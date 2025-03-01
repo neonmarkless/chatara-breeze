@@ -122,7 +122,7 @@ const ChatSidebar: React.FC = () => {
           variant="outline" 
           className="w-full justify-start gap-3 border border-sidebar-border hover:bg-sidebar-accent"
         >
-          <SquaresPlusIcon size={16} />
+          <SquarePlusIcon size={16} />
           <span>{t('explorGPTs')}</span>
         </Button>
         
