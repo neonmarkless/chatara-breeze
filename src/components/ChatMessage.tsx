@@ -24,6 +24,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const isLast = !isUser && isStreaming;
   
+  // Function to copy message content to clipboard
   const copyToClipboard = () => {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -33,20 +34,54 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   // Check if there are attachments
   const hasAttachments = message.attachments && message.attachments.length > 0;
   
+  // Try to parse JSON if the content appears to be a JSON object
+  const renderContent = () => {
+    if (!message.content) return '';
+    
+    let content = message.content;
+    
+    // Detect if content might be JSON and try to extract actual text
+    if (content.includes('"event"') && content.includes('"data"') && content.includes('"message"')) {
+      try {
+        // Try different patterns to extract the actual message content
+        const jsonMatch = content.match(/"message"\s*:\s*"([^"]*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          content = jsonMatch[1];
+        } else {
+          // If we couldn't extract a specific message, try to parse and stringify the JSON for better display
+          const parsedJson = JSON.parse(content);
+          if (parsedJson && typeof parsedJson === 'object') {
+            // Look for message or text fields
+            if (parsedJson.message?.data) {
+              content = parsedJson.message.data;
+            } else if (parsedJson.data) {
+              content = parsedJson.data;
+            }
+          }
+        }
+      } catch (e) {
+        // If parsing fails, just use the original content
+        console.log("Failed to parse JSON content:", e);
+      }
+    }
+    
+    return content;
+  };
+  
   return (
     <div
       className={cn(
-        "py-6 px-4 md:px-6 w-full flex flex-col border-b",
-        "animate-in fade-in",
+        "py-6 px-4 md:px-6 w-full flex flex-col border-b transition-colors",
+        "animate-in fade-in duration-300",
         isUser ? "bg-chat-user dark:bg-gray-800/40" : "bg-white dark:bg-gray-900"
       )}
     >
       <div className="max-w-3xl mx-auto w-full flex gap-4 md:gap-6">
         <Avatar className={cn(
-          "h-8 w-8",
+          "h-8 w-8 transition-all",
           isUser 
-            ? "bg-gradient-to-br from-primary to-blue-600" 
-            : "bg-gradient-to-br from-gray-700 to-gray-900"
+            ? "bg-gradient-to-br from-blue-500 to-indigo-600" 
+            : "bg-gradient-to-br from-violet-500 to-fuchsia-600"
         )}>
           {isUser ? (
             <AvatarFallback className="text-white">
@@ -72,7 +107,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 code({node, inline, className, children, ...props}) {
                   const match = /language-(\w+)/.exec(className || '');
                   return !inline && match ? (
-                    <div className="relative group">
+                    <div className="relative group my-4">
                       <div className="absolute right-2 top-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => navigator.clipboard.writeText(String(children).replace(/\n$/, ''))}
@@ -85,7 +120,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                         style={atomDark}
                         language={match[1]}
                         PreTag="div"
-                        className="rounded-md !mt-0"
+                        className="rounded-md !mt-0 shadow-lg"
                         {...props}
                       >
                         {String(children).replace(/\n$/, '')}
@@ -123,11 +158,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 }
               }}
             >
-              {message.content}
+              {renderContent()}
             </ReactMarkdown>
             
             {isLast && (
-              <span className="animate-pulse absolute -bottom-4 ml-1 inline-block w-1.5 h-4 bg-primary"></span>
+              <span className="typing-dot inline-block after:content-[''] after:inline-block after:w-1.5 after:h-4 after:ml-1 after:animate-cursor-blink after:bg-primary"></span>
             )}
           </div>
           
@@ -155,6 +190,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             </div>
           )}
           
+          {/* Message actions */}
           {!isUser && (
             <div className="flex items-center gap-2 mt-4">
               <Button

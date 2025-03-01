@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from '@/lib/utils';
 import { Attachment } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
+import { useTheme } from 'next-themes';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -20,6 +21,7 @@ const MessageInput: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { theme } = useTheme();
 
   // Adjust textarea height based on content
   useEffect(() => {
@@ -119,9 +121,9 @@ const MessageInput: React.FC = () => {
     >
       {/* Error message */}
       {error && (
-        <div className="mb-2 text-red-500 text-sm flex items-center">
-          <AlertCircle size={14} className="mr-1" />
-          {error}
+        <div className="mb-2 text-red-500 text-sm flex items-center bg-red-50 dark:bg-red-900/20 p-2 rounded-md animate-fade-in">
+          <AlertCircle size={14} className="mr-1 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
       
@@ -131,14 +133,14 @@ const MessageInput: React.FC = () => {
           {attachments.map(attachment => (
             <div 
               key={attachment.id} 
-              className="relative flex items-center p-2 bg-secondary rounded-md shadow-sm group"
+              className="relative flex items-center p-2 bg-secondary rounded-md shadow-sm group animate-fade-in"
             >
               <span className="text-xs mr-8">{attachment.name.length > 20 ? `${attachment.name.substring(0, 20)}...` : attachment.name}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-5 w-5 p-0 absolute right-1 opacity-50 group-hover:opacity-100"
+                className="h-5 w-5 p-0 absolute right-1 opacity-50 group-hover:opacity-100 transition-opacity"
                 onClick={() => removeAttachment(attachment.id)}
               >
                 <X size={14} />
@@ -153,7 +155,7 @@ const MessageInput: React.FC = () => {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10 p-2 text-muted-foreground hover:text-foreground"
+          className="h-10 w-10 p-2 text-muted-foreground hover:text-foreground transition-colors"
           onClick={handleFileClick}
           disabled={isLoading || isStreaming}
         >
@@ -192,7 +194,7 @@ const MessageInput: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-10 w-10 p-2 mr-1 text-muted-foreground hover:text-foreground",
+                  "h-10 w-10 p-2 mr-1 text-muted-foreground hover:text-foreground transition-colors",
                   isVoiceRecording ? "text-primary" : ""
                 )}
                 onClick={toggleVoiceRecording}
@@ -217,7 +219,7 @@ const MessageInput: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-10 w-10 p-2 mr-1",
+                  "h-10 w-10 p-2 mr-1 transition-colors",
                   (message.trim() !== '' || attachments.length > 0) && !isLoading && !isStreaming 
                     ? "text-primary hover:text-primary/80" 
                     : "text-muted-foreground",
@@ -235,7 +237,7 @@ const MessageInput: React.FC = () => {
         </TooltipProvider>
       </div>
       
-      <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse-light">
+      <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse-light transition-colors">
         {isStreaming ? t('aiIsGenerating') : t('canMakeMistakes')}
       </p>
     </form>

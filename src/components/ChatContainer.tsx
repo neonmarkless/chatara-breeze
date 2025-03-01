@@ -5,11 +5,13 @@ import { useChat } from '@/context/ChatContext';
 import ChatMessage from './ChatMessage';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from 'next-themes';
 
 const ChatContainer: React.FC = () => {
   const { t } = useTranslation();
   const { currentConversation, isLoading, isStreaming } = useChat();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const { theme } = useTheme();
   
   // Scroll to the bottom when messages change or during streaming
   useEffect(() => {
@@ -19,7 +21,9 @@ const ChatContainer: React.FC = () => {
   // If there's no conversation or no messages, display welcome screen
   if (!currentConversation || currentConversation.messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-4 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 transition-colors duration-200
+                      bg-gradient-to-b from-white to-gray-50 
+                      dark:from-gray-900 dark:to-gray-800">
         <div className="w-20 h-20 mb-8 rounded-full bg-primary/10 flex items-center justify-center">
           <svg
             viewBox="0 0 24 24"
@@ -40,7 +44,7 @@ const ChatContainer: React.FC = () => {
             ></path>
           </svg>
         </div>
-        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-apple-blue bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-blue-600 dark:from-blue-400 dark:to-purple-500 bg-clip-text text-transparent">
           {t('chatGPT')}
         </h2>
         <h3 className="text-xl mb-8 text-gray-600 dark:text-gray-300">
@@ -63,7 +67,10 @@ const ChatContainer: React.FC = () => {
   }
   
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex-1 overflow-y-auto scrollbar-thin
+                   bg-gradient-to-b from-white to-gray-50 
+                   dark:from-gray-900 dark:via-gray-850 dark:to-gray-800 
+                   transition-colors duration-300">
       {/* Messages */}
       {currentConversation.messages.map((message) => (
         <ChatMessage key={message.id} message={message} />
@@ -76,15 +83,15 @@ const ChatContainer: React.FC = () => {
           "animate-in fade-in"
         )}>
           <div className="max-w-3xl mx-auto w-full flex gap-4 md:gap-6">
-            <div className="h-8 w-8 rounded-full bg-black flex items-center justify-center">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center">
               <span className="text-sm font-medium text-white">A</span>
             </div>
             
             <div className="flex items-center">
-              <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+              <div className="flex space-x-2 items-center">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse delay-150"></div>
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse delay-300"></div>
               </div>
             </div>
           </div>

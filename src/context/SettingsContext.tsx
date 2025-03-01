@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDirection } from './DirectionContext';
+import { useTheme } from 'next-themes';
+import { useToast } from '@/components/ui/use-toast';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -15,19 +17,15 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('system');
   const [language, setLanguageState] = useState<string>('en');
   const { i18n } = useTranslation();
   const { setDirectionBasedOnLanguage } = useDirection();
+  const { theme, setTheme: setNextTheme } = useTheme();
+  const { toast } = useToast();
 
   // Load settings from localStorage on initial render
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme') as Theme | null;
     const storedLanguage = localStorage.getItem('language');
-    
-    if (storedTheme) {
-      setThemeState(storedTheme);
-    }
     
     if (storedLanguage) {
       setLanguageState(storedLanguage);
@@ -36,39 +34,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [i18n, setDirectionBasedOnLanguage]);
 
-  // Update theme class on document when theme changes
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
-    }
-  }, [theme]);
-
-  // Set up system theme change listener
-  useEffect(() => {
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      
-      const handleChange = () => {
-        const root = window.document.documentElement;
-        root.classList.remove('light', 'dark');
-        root.classList.add(mediaQuery.matches ? 'dark' : 'light');
-      };
-      
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-  }, [theme]);
-
   const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+    setNextTheme(newTheme);
+    
+    toast({
+      title: "Theme Changed",
+      description: `Theme set to ${newTheme === 'system' ? 'system preference' : newTheme}.`,
+      duration: 2000,
+    });
   };
 
   const setLanguage = (newLanguage: string) => {
@@ -76,10 +49,21 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     i18n.changeLanguage(newLanguage);
     localStorage.setItem('language', newLanguage);
     setDirectionBasedOnLanguage(newLanguage);
+    
+    toast({
+      title: "Language Changed",
+      description: `Language set to ${newLanguage === 'en' ? 'English' : 'العربية'}.`,
+      duration: 2000,
+    });
   };
 
   return (
-    <SettingsContext.Provider value={{ theme, setTheme, language, setLanguage }}>
+    <SettingsContext.Provider value={{ 
+      theme: (theme as Theme) || 'system', 
+      setTheme, 
+      language, 
+      setLanguage 
+    }}>
       {children}
     </SettingsContext.Provider>
   );

@@ -72,6 +72,9 @@ export default {
 				},
 				apple: {
 					blue: '#007AFF'
+				},
+				gray: {
+					850: '#1a1d23'
 				}
 			},
 			borderRadius: {

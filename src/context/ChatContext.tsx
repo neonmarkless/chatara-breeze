@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, Conversation, ChatContextType, Attachment } from '@/types/chat';
+import { useToast } from '@/components/ui/use-toast';
 
 // Create the context
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -19,6 +20,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [searchResults, setSearchResults] = useState<Conversation[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const { toast } = useToast();
 
   // Initialize with a demo conversation or load from storage
   useEffect(() => {
@@ -90,6 +92,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         newConversation();
       }
     }
+
+    toast({
+      title: "Conversation deleted",
+      description: "Your conversation has been removed",
+    });
   };
 
   // Search conversations
@@ -122,24 +129,33 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     conversationHistory: { role: string; content: string }[]
   ) => {
     try {
-      const response = await fetch(`${FLOWISE_API_HOST}/api/v1/prediction/${FLOWISE_CHATFLOW_ID}`, {
+      // Prepare streaming URL
+      const apiUrl = `${FLOWISE_API_HOST}/api/v1/prediction/${FLOWISE_CHATFLOW_ID}`;
+      
+      // Prepare request body
+      const body = {
+        question: conversationHistory[conversationHistory.length - 1].content,
+        history: conversationHistory.slice(0, -1),
+        streaming: true
+      };
+
+      console.log("Sending request to Flowise API:", body);
+
+      // Make the fetch request
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          question: conversationHistory[conversationHistory.length - 1].content,
-          history: conversationHistory.slice(0, -1),
-          streaming: true
-        })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        throw new Error(`API Error: ${response.status} - ${await response.text()}`);
       }
 
       if (!response.body) {
-        throw new Error('ReadableStream not supported');
+        throw new Error('ReadableStream not supported in this browser');
       }
 
       // Initialize streaming
@@ -169,10 +185,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         prev.map(conv => conv.id === conversationId ? updatedConversation : conv)
       );
 
+      // Process the stream
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
       let accumulatedContent = '';
+      let fullResponse = '';
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
@@ -181,13 +199,42 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (done) break;
         
         const chunkText = decoder.decode(value);
-        accumulatedContent += chunkText;
-        setStreamingContent(accumulatedContent);
+        
+        try {
+          // Try to parse the chunk as JSON
+          const parsedChunks = chunkText
+            .split('\n')
+            .filter(chunk => chunk.trim() !== '')
+            .map(chunk => {
+              try {
+                return JSON.parse(chunk);
+              } catch (e) {
+                return { text: chunk };
+              }
+            });
+
+          // Extract text from each parsed chunk
+          for (const parsedChunk of parsedChunks) {
+            if (parsedChunk.text) {
+              fullResponse += parsedChunk.text;
+            } else if (parsedChunk.type === 'text') {
+              fullResponse += parsedChunk.data?.text || '';
+            } else if (typeof parsedChunk === 'string') {
+              fullResponse += parsedChunk;
+            }
+          }
+        } catch (e) {
+          // If parsing fails, just append the raw chunk
+          console.warn('Error parsing chunk:', e);
+          fullResponse += chunkText;
+        }
+        
+        setStreamingContent(fullResponse);
         
         // Update the assistant message with the latest content
         const updatedMessage = {
           ...initialAssistantMessage,
-          content: accumulatedContent
+          content: fullResponse
         };
         
         const updatedConversationWithStream = {
@@ -207,6 +254,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Streaming complete
       setIsStreaming(false);
       setIsLoading(false);
+      
+      console.log("Streaming complete, final response:", fullResponse);
       
     } catch (error) {
       console.error('Error with streaming response:', error);
@@ -231,6 +280,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setConversations(prev => 
         prev.map(conv => conv.id === conversationId ? conversationWithError : conv)
       );
+
+      toast({
+        title: "Error",
+        description: "Failed to get a response. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -314,6 +369,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setConversations(prev => 
           prev.map(conv => (conv.id === currentConversation.id ? conversationWithError : conv))
         );
+
+        toast({
+          title: "Error",
+          description: "Failed to get a response. Please try again.",
+          variant: "destructive"
+        });
       }
     }
   };
