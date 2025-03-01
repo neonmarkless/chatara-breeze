@@ -10,7 +10,6 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useChat } from '@/context/ChatContext';
-import { useUser } from '@/context/UserContext';
 
 interface ChatMessageProps {
   message: Message;
@@ -21,7 +20,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
   const { direction } = useDirection();
   const { isStreaming } = useChat();
-  const { user } = useUser();
   
   const isUser = message.role === 'user';
   const isLast = !isUser && isStreaming;
@@ -35,6 +33,40 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
   // Check if there are attachments
   const hasAttachments = message.attachments && message.attachments.length > 0;
+  
+  // Try to parse JSON if the content appears to be a JSON object
+  const renderContent = () => {
+    if (!message.content) return '';
+    
+    let content = message.content;
+    
+    // Detect if content might be JSON and try to extract actual text
+    if (content.includes('"event"') && content.includes('"data"') && content.includes('"message"')) {
+      try {
+        // Try different patterns to extract the actual message content
+        const jsonMatch = content.match(/"message"\s*:\s*"([^"]*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          content = jsonMatch[1];
+        } else {
+          // If we couldn't extract a specific message, try to parse and stringify the JSON for better display
+          const parsedJson = JSON.parse(content);
+          if (parsedJson && typeof parsedJson === 'object') {
+            // Look for message or text fields
+            if (parsedJson.message?.data) {
+              content = parsedJson.message.data;
+            } else if (parsedJson.data) {
+              content = parsedJson.data;
+            }
+          }
+        }
+      } catch (e) {
+        // If parsing fails, just use the original content
+        console.log("Failed to parse JSON content:", e);
+      }
+    }
+    
+    return content;
+  };
   
   return (
     <div
@@ -52,12 +84,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             : "bg-gradient-to-br from-violet-500 to-fuchsia-600"
         )}>
           {isUser ? (
-            <>
-              <AvatarImage src={user?.user_metadata?.avatar_url} alt="User" />
-              <AvatarFallback className="text-white">
-                {user?.email?.charAt(0).toUpperCase() || "U"}
-              </AvatarFallback>
-            </>
+            <AvatarFallback className="text-white">
+              U
+            </AvatarFallback>
           ) : (
             <AvatarFallback className="text-white">
               A
@@ -129,7 +158,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 }
               }}
             >
-              {message.content}
+              {renderContent()}
             </ReactMarkdown>
             
             {isLast && (
