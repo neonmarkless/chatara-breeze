@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlusIcon, SquaresPlusIcon, ChevronDownIcon } from 'lucide-react';
+import { PlusIcon, SquarePlusIcon, ChevronDownIcon } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
 import { formatDate } from '@/lib/utils';
 import { useDirection } from '@/context/DirectionContext';
