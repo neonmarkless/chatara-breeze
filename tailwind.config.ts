@@ -19,6 +19,9 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Tajawal', 'sans-serif'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -66,10 +69,10 @@ export default {
 				chat: {
 					user: 'hsl(var(--chat-user))',
 					assistant: 'hsl(var(--chat-assistant))'
+				},
+				apple: {
+					blue: '#007AFF'
 				}
-			},
-			fontFamily: {
-				sans: ['var(--font-tajawal)', 'sans-serif'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

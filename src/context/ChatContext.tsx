@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Message, Conversation, ChatContextType } from '@/types/chat';
+import { Message, Conversation, ChatContextType, Attachment } from '@/types/chat';
 
 // Create the context
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -11,6 +11,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<Conversation[]>([]);
 
   // Initialize with a demo conversation or load from storage
   useEffect(() => {
@@ -84,15 +86,40 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Search conversations
+  const searchConversations = (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results = conversations.filter(conv => {
+      // Search in title
+      if (conv.title.toLowerCase().includes(query.toLowerCase())) {
+        return true;
+      }
+      
+      // Search in messages
+      return conv.messages.some(msg => 
+        msg.content.toLowerCase().includes(query.toLowerCase())
+      );
+    });
+    
+    setSearchResults(results);
+  };
+
   // Add a message to the current conversation
-  const addMessage = async (content: string, role: 'user' | 'assistant' | 'system') => {
+  const addMessage = async (content: string, role: 'user' | 'assistant' | 'system', attachments: Attachment[] = []) => {
     if (!currentConversation) return;
     
     const message: Message = {
       id: uuidv4(),
       role,
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachments: attachments.length > 0 ? [...attachments] : undefined
     };
     
     // Create updated conversation
@@ -130,10 +157,12 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Simulated response for demo (would normally come from API)
-        let aiResponse = "I'm a virtual assistant ready to help with any questions or tasks. What else would you like to know?";
+        let aiResponse: string;
         
-        // Create more contextual responses based on user input
-        if (content.toLowerCase().includes('hello') || content.toLowerCase().includes('hi')) {
+        // Handle different types of inputs
+        if (attachments && attachments.length > 0) {
+          aiResponse = "I've received your file(s). Let me process them and get back to you with my analysis.";
+        } else if (content.toLowerCase().includes('hello') || content.toLowerCase().includes('hi')) {
           aiResponse = "Hello! How can I assist you today?";
         } else if (content.toLowerCase().includes('help')) {
           aiResponse = "I'd be happy to help. Could you provide more details about what you need assistance with?";
@@ -143,6 +172,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           aiResponse = "I don't have real-time access to weather data, but I can help you understand weather patterns or direct you to reliable weather services.";
         } else if (content.includes('?')) {
           aiResponse = "That's an interesting question. While I don't have access to real-time information, I can provide general guidance on this topic.";
+        } else if (content.toLowerCase().includes('code') || content.toLowerCase().includes('javascript')) {
+          aiResponse = "Here's a simple example in JavaScript:\n\n```javascript\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet('World'));\n// Outputs: Hello, World!\n```\n\nYou can modify this to suit your needs.";
+        } else {
+          aiResponse = "I'm a virtual assistant ready to help with any questions or tasks. What else would you like to know?";
         }
         
         // Add the AI response
@@ -196,7 +229,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isLoading,
     addMessage,
     newConversation,
-    deleteConversation
+    deleteConversation,
+    searchConversations,
+    searchResults
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

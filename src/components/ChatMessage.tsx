@@ -1,10 +1,14 @@
 
 import React, { useState } from 'react';
-import { Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Copy, Check, ThumbsUp, ThumbsDown, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Message } from '@/types/chat';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useDirection } from '@/context/DirectionContext';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ChatMessageProps {
   message: Message;
@@ -13,6 +17,7 @@ interface ChatMessageProps {
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
+  const { direction } = useDirection();
   
   const isUser = message.role === 'user';
   
@@ -21,6 +26,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Check if there are attachments
+  const hasAttachments = message.attachments && message.attachments.length > 0;
   
   return (
     <div
@@ -32,15 +40,61 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     >
       <div className="max-w-3xl mx-auto w-full flex gap-4 md:gap-6">
         <Avatar className={cn("h-8 w-8", isUser ? "bg-primary" : "bg-black")}>
-          <AvatarFallback className={cn("text-sm", isUser ? "bg-primary text-primary-foreground" : "bg-black text-white")}>
-            {isUser ? 'U' : 'A'}
-          </AvatarFallback>
+          {isUser ? (
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              U
+            </AvatarFallback>
+          ) : (
+            <AvatarFallback className="bg-black text-white">
+              A
+            </AvatarFallback>
+          )}
         </Avatar>
         
-        <div className="flex-1 space-y-2 overflow-hidden">
+        <div className={cn(
+          "flex-1 space-y-2 overflow-hidden",
+          direction === 'rtl' ? 'rtl-text' : 'ltr-text'
+        )}>
           <div className="prose prose-neutral dark:prose-invert">
-            <div className="markdown">{message.content}</div>
+            <ReactMarkdown
+              components={{
+                code({node, inline, className, children, ...props}) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      style={atomDark}
+                      language={match[1]}
+                      PreTag="div"
+                      {...props}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  )
+                }
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
+          
+          {/* Attachments section */}
+          {hasAttachments && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {message.attachments.map((attachment, index) => (
+                <div 
+                  key={index} 
+                  className="flex items-center p-2 border rounded-md bg-muted/30"
+                >
+                  <FileText size={16} className="mr-2" />
+                  <span className="text-sm">{attachment.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
           
           {!isUser && (
             <div className="flex items-center gap-2 mt-4">

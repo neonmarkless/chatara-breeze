@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlusIcon, SquarePlusIcon, ChevronDownIcon } from 'lucide-react';
+import { PlusIcon, SquarePlusIcon, ChevronDownIcon, SearchIcon, TrashIcon } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
 import { formatDate } from '@/lib/utils';
 import { useDirection } from '@/context/DirectionContext';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 
 const ChatSidebar: React.FC = () => {
   const { t } = useTranslation();
@@ -18,13 +19,26 @@ const ChatSidebar: React.FC = () => {
     currentConversation, 
     setCurrentConversation, 
     newConversation,
-    deleteConversation
+    deleteConversation,
+    searchConversations,
+    searchResults
   } = useChat();
   
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    searchConversations(query);
+  };
+
+  // Use search results if search is active, otherwise use conversations
+  const displayedConversations = searchQuery.trim() ? searchResults : conversations;
 
   // Group conversations by month
-  const groupedConversations = conversations.reduce((acc, conversation) => {
+  const groupedConversations = displayedConversations.reduce((acc, conversation) => {
     const date = new Date(conversation.createdAt);
     const month = date.getMonth();
     const year = date.getFullYear();
@@ -71,49 +85,72 @@ const ChatSidebar: React.FC = () => {
         </Button>
       </div>
       
+      {/* Search Bar */}
+      <div className="px-3 pb-2">
+        <div className="relative">
+          <SearchIcon 
+            size={16} 
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" 
+          />
+          <Input
+            type="text"
+            placeholder={t('search')}
+            value={searchQuery}
+            onChange={handleSearch}
+            className="pl-9 text-sm bg-sidebar-accent"
+          />
+        </div>
+      </div>
+      
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        {groupedConversationsArray.map((group) => (
-          <div key={group.key} className="mb-4">
-            <h3 className="px-3 py-2 text-xs font-medium text-sidebar-foreground/60">
-              {group.monthName}
-            </h3>
-            <ul>
-              {group.conversations.map((conversation) => (
-                <li key={conversation.id}>
-                  <button
-                    onClick={() => setCurrentConversation(conversation)}
-                    className={cn(
-                      "w-full text-start px-3 py-2 text-sm truncate hover:bg-sidebar-accent",
-                      "transition-colors duration-200 ease-in-out",
-                      currentConversation?.id === conversation.id 
-                        ? "bg-sidebar-accent font-medium" 
-                        : ""
-                    )}
-                  >
-                    <div className="flex w-full items-center">
-                      <span className="flex-1 truncate">{conversation.title}</span>
-                      {currentConversation?.id === conversation.id && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteConversation(conversation.id);
-                          }}
-                        >
-                          <span className="sr-only">Delete</span>
-                          {/* You can add an X icon here */}
-                        </Button>
+        {groupedConversationsArray.length > 0 ? (
+          groupedConversationsArray.map((group) => (
+            <div key={group.key} className="mb-4">
+              <h3 className="px-3 py-2 text-xs font-medium text-sidebar-foreground/60">
+                {group.monthName}
+              </h3>
+              <ul>
+                {group.conversations.map((conversation) => (
+                  <li key={conversation.id} className="group">
+                    <button
+                      onClick={() => setCurrentConversation(conversation)}
+                      className={cn(
+                        "w-full text-start px-3 py-2 text-sm truncate hover:bg-sidebar-accent",
+                        "transition-colors duration-200 ease-in-out flex items-center justify-between",
+                        currentConversation?.id === conversation.id 
+                          ? "bg-sidebar-accent font-medium" 
+                          : ""
                       )}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    >
+                      <span className="flex-1 truncate">{conversation.title}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conversation.id);
+                        }}
+                      >
+                        <TrashIcon size={14} />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        ) : searchQuery ? (
+          <div className="px-3 py-4 text-center text-muted-foreground">
+            No conversations match your search
           </div>
-        ))}
+        ) : (
+          <div className="px-3 py-4 text-center text-muted-foreground">
+            No conversations yet
+          </div>
+        )}
       </div>
       
       {/* Bottom Section */}
